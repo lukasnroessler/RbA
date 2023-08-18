@@ -14,11 +14,13 @@ MODEL:
     NORM: "SyncBN"  # use syncbn for cityscapes dataset
     RES5_MULTI_GRID: [1, 1, 1]  # not used
 DATASETS:
-  TRAIN: ("cityscapes_fine_sem_seg_train",)
-  TEST: ("cityscapes_fine_sem_seg_val",)
+  TRAIN: ("cityscapes_fine_sem_seg_train",) # TODO: change this
+  TEST: ("cityscapes_fine_sem_seg_val",) # TODO: Change this
 SOLVER:
-  IMS_PER_BATCH: 16
-  BASE_LR: 0.0001
+  # IMS_PER_BATCH: 16
+  IMS_PER_BATCH: 1
+  # BASE_LR: 0.0001
+  BASE_LR: 0.01
   MAX_ITER: 90000
   WARMUP_FACTOR: 1.0
   WARMUP_ITERS: 0

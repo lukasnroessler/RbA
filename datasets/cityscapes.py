@@ -148,7 +148,7 @@ class Cityscapes(data.Dataset):
 
     def _get_target_suffix(self, mode, target_type):
         if target_type == 'instance':
-            return '{}_instanceIds.png'.format(mode)
+            return '{}_instanceIds.png'.format(mode) # inserts mode='gtFine' in brackets
         elif target_type == 'semantic':
             return '{}_labelIds.png'.format(mode)
         elif target_type == 'semantic_trainids':

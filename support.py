@@ -81,15 +81,15 @@ def get_datasets(datasets_folder):
     ])
 
     DATASETS = edict(
-        cityscapes=Cityscapes(cityscapes_config, transform=transform, split='val', target_type='semantic'),
-        bdd100k=BDD100KSeg(hparams=bdd100k_config, mode='val', transforms=transform, image_size=(720, 1280)),
+        # cityscapes=Cityscapes(cityscapes_config, transform=transform, split='val', target_type='semantic'),
+        # bdd100k=BDD100KSeg(hparams=bdd100k_config, mode='val', transforms=transform, image_size=(720, 1280)),
         road_anomaly=RoadAnomaly(hparams=road_anomaly_config, transforms=transform),
-        fishyscapes_laf=FishyscapesLAF(hparams=fishyscapes_laf_config, transforms=transform),
-        fs_static=FishyscapesStatic(hparams=fishyscapes_static_config, transforms=transform, version=1),
-        fs_static_v2=FishyscapesStatic(hparams=fishyscapes_static_config, transforms=transform, version=2),
-        road_anomaly_21=RoadAnomaly21(hparams=road_anomaly_21_config, transforms=transform_ra_21),
-        road_obstacles=RoadObstacle21(road_obstacle_21_config, transforms=transform),
-        lost_and_found=LostAndFound(laf_config, transform) 
+        # fishyscapes_laf=FishyscapesLAF(hparams=fishyscapes_laf_config, transforms=transform),
+        # fs_static=FishyscapesStatic(hparams=fishyscapes_static_config, transforms=transform, version=1),
+        # fs_static_v2=FishyscapesStatic(hparams=fishyscapes_static_config, transforms=transform, version=2),
+        # road_anomaly_21=RoadAnomaly21(hparams=road_anomaly_21_config, transforms=transform_ra_21),
+        # road_obstacles=RoadObstacle21(road_obstacle_21_config, transforms=transform),
+        # lost_and_found=LostAndFound(laf_config, transform) 
     )
 
     return DATASETS

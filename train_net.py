@@ -45,6 +45,7 @@ from detectron2.evaluation import (
 )
 from detectron2.modeling import build_model
 from detectron2.projects.deeplab import add_deeplab_config, build_lr_scheduler
+# from detectron2.projects import add_deeplab_config, build_lr_scheduler
 from detectron2.solver.build import maybe_add_gradient_clipping
 from detectron2.utils.logger import setup_logger
 
@@ -382,7 +383,7 @@ def main(args):
         return res
 
     trainer = Trainer(cfg)
-    trainer.resume_or_load(resume=args.resume)
+    trainer.resume_or_load(resume=args.resume) 
     print("Trainable Params:")
     for n, m in trainer._trainer.model.named_parameters():
         if m.requires_grad:
