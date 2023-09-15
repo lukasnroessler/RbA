@@ -82,7 +82,7 @@ if args.dataset_mode == 'selective':
         raise ValueError(
             "Selective Mode is chosen but number of selected datasets is 0")
 else:
-    dataset_group = [g for g in dataset_group if g[0] in ['road_anomaly', 'fishyscapes_laf']]
+    dataset_group = [g for g in dataset_group if g[0] in ['road_anomaly', 'AnoVox', 'fishyscapes_laf']]
 
 print("Datasets to be evaluated:")
 [print(g[0]) for g in dataset_group]
@@ -222,7 +222,9 @@ def run_evaluations(model, dataset, model_name, dataset_name):
         os.makedirs(vis_path, exist_ok=True)
         for i in tqdm(range(len(anomaly_score)), desc=f"storing anomaly scores at {vis_path}"):
             
-            mpimg.imsave(os.path.join(vis_path, f"score_{i}.png"), anomaly_score[i].squeeze(), cmap='viridis')
+            np.save(os.path.join(vis_path, f"score_{i}.npy"), anomaly_score[i])
+
+            # mpimg.imsave(os.path.join(vis_path, f"score_{i}.png"), anomaly_score[i].squeeze(), cmap='viridis')
 
 
 

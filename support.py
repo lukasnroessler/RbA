@@ -15,6 +15,7 @@ from datasets.road_anomaly import RoadAnomaly
 from datasets.fishyscapes import FishyscapesLAF, FishyscapesStatic
 from datasets.segment_me_if_you_can import RoadAnomaly21, RoadObstacle21
 from datasets.lost_and_found import LostAndFound
+from datasets.anovox_cityscapes import AnoVox
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 from tqdm import tqdm
@@ -26,6 +27,9 @@ from ood_metrics import fpr_at_95_tpr
 
 def get_datasets(datasets_folder):
 
+    anovox_config = edict(
+        dataset_root = os.path.join(datasets_folder, 'AnoVox'),
+    )
     # Configs for Datasets
     bdd100k_config = edict(
         seg_downsample_rate=1,
@@ -81,9 +85,10 @@ def get_datasets(datasets_folder):
     ])
 
     DATASETS = edict(
+        anovox = AnoVox(hparams=anovox_config, transform=transform),
         # cityscapes=Cityscapes(cityscapes_config, transform=transform, split='val', target_type='semantic'),
         # bdd100k=BDD100KSeg(hparams=bdd100k_config, mode='val', transforms=transform, image_size=(720, 1280)),
-        road_anomaly=RoadAnomaly(hparams=road_anomaly_config, transforms=transform),
+        # road_anomaly=RoadAnomaly(hparams=road_anomaly_config, transforms=transform),
         # fishyscapes_laf=FishyscapesLAF(hparams=fishyscapes_laf_config, transforms=transform),
         # fs_static=FishyscapesStatic(hparams=fishyscapes_static_config, transforms=transform, version=1),
         # fs_static_v2=FishyscapesStatic(hparams=fishyscapes_static_config, transforms=transform, version=2),
