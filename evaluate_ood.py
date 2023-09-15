@@ -82,7 +82,7 @@ if args.dataset_mode == 'selective':
         raise ValueError(
             "Selective Mode is chosen but number of selected datasets is 0")
 else:
-    dataset_group = [g for g in dataset_group if g[0] in ['road_anomaly', 'AnoVox', 'fishyscapes_laf']]
+    dataset_group = [g for g in dataset_group if g[0] in ['road_anomaly', 'anovox', 'fishyscapes_laf']]
 
 print("Datasets to be evaluated:")
 [print(g[0]) for g in dataset_group]

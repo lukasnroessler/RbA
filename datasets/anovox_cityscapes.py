@@ -126,7 +126,7 @@ class AnoVox(data.Dataset):
         """
         anomaly_color = [245,0,0]
         # image = np.array(Image.open(self.images[index]).convert('RGB'))
-        image = np.array(Image.open(self.images[index]))
+        image = np.array(Image.open(self.images[index]).convert('RGB'))
         target = np.array(Image.open(self.targets[index]))
         label = np.zeros((target.shape), dtype=np.uint8)[:,:,:1]
         label = np.squeeze(label)
