@@ -124,10 +124,10 @@ def voxel_transform(scores, depths):
             x, y = (j - cx) * z / focal, (i - cy) * z / focal
             coordinate = [x,y,z]
 
-            # if np.linalg.norm(coordinate) > 100:
-            #     continue
-            # else:
-            point_list.append(coordinate)
+            if np.linalg.norm(coordinate) > 100:
+                continue
+            else:
+                point_list.append(coordinate)
                 # red, green, blue = (
                 #     semantic_color[0],
                 #     semantic_color[1],
@@ -136,7 +136,7 @@ def voxel_transform(scores, depths):
                 # point_color = [
                 #     i / 255.0 for i in [red, green, blue]
                 # ]  # format to o3d color values
-            anomaly_score_list.append(anomaly_score)
+                anomaly_score_list.append(anomaly_score)
 
     depth_pcloud = o3d.geometry.PointCloud()  # create point cloud object
     depth_pcloud.points = o3d.utility.Vector3dVector(
@@ -150,16 +150,28 @@ def voxel_transform(scores, depths):
     depth_pcloud.rotate(
         r_matrix, center=(0, 0, 0)
     )  # rotate depth point cloud to fit lidar point cloud
+    o3d.visualization.draw_geometries([depth_pcloud])
     depth_points = np.asarray(depth_pcloud.points)
     anomaly_score_list = np.reshape(np.array(anomaly_score_list), (len(anomaly_score_list), 1))
     return np.concatenate([depth_points, anomaly_score_list], axis=1)
 
-
-def voxelize_one(depth_img, eval_image, save_name, pipe=None):
+def img2pcd():
+    eval_image = np.load(args.eval_img)
+    depth_img = Image.open(args.depth_img)
     depth_img_arr = np.array(depth_img)
     depth_img_arr = calculate_carla_depth(depth_img_arr, np.zeros((depth_img.height, depth_img.width,)),
                                           depth_img.height, depth_img.width)
     pcloud = voxel_transform(eval_image, depth_img_arr)
+
+    file_name = "voxel" + os.path.basename(str(args.eval_img))
+
+    return pcloud, file_name
+    
+
+
+
+
+def voxelize_one(pcloud, save_name, pipe=None):
     offset_x = bev_offset_forward * bev_resolution
     offset_z = 0
     voxel_points, semantics = voxel_filter(pcloud, args.voxel_resolution, WORLD_SIZE, [offset_x, 0, offset_z])
@@ -293,10 +305,8 @@ def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
 
 
 def main():
-    eval_image = np.load(args.eval_img)
-    depth_img = Image.open(args.depth_img)
-    file_name = "voxel" + os.path.basename(str(args.eval_img))
-    voxelize_one(depth_img, eval_image, file_name)
+    image_point_cloud, file_name = img2pcd()
+    voxelize_one(image_point_cloud, file_name)
 
 
 if __name__ == "__main__":
