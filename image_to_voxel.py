@@ -3,6 +3,7 @@ import open3d as o3d
 import sys
 import argparse
 from numba import jit
+import os
 from PIL import Image
 
 
@@ -79,8 +80,6 @@ def check_file_ending(path):
 
 
 
-
-
 @jit(nopython=True)  # Compile the function with Numba
 def calculate_carla_depth(depth_img, new_depth, height, width):
     # depth_img = Image.open(depth_img)
@@ -151,9 +150,16 @@ def voxel_transform(scores, depths):
     depth_pcloud.rotate(
         r_matrix, center=(0, 0, 0)
     )  # rotate depth point cloud to fit lidar point cloud
-    return depth_pcloud    
+    depth_points = np.asarray(depth_pcloud.points)
+    anomaly_score_list = np.reshape(np.array(anomaly_score_list), (len(anomaly_score_list), 1))
+    return np.concatenate([depth_points, anomaly_score_list], axis=1)
 
-def voxelize_one(pcloud, save_name, pipe=None):
+
+def voxelize_one(depth_img, eval_image, save_name, pipe=None):
+    depth_img_arr = np.array(depth_img)
+    depth_img_arr = calculate_carla_depth(depth_img_arr, np.zeros((depth_img.height, depth_img.width,)),
+                                          depth_img.height, depth_img.width)
+    pcloud = voxel_transform(eval_image, depth_img_arr)
     offset_x = bev_offset_forward * bev_resolution
     offset_z = 0
     voxel_points, semantics = voxel_filter(pcloud, args.voxel_resolution, WORLD_SIZE, [offset_x, 0, offset_z])
@@ -169,10 +175,10 @@ def voxelize_one(pcloud, save_name, pipe=None):
 
 
 def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
-    pcd = np.asarray(pcloud.points)
-    sem = (np.asarray(pcloud.colors) * 255.0).astype(np.uint8)
-    # pcd = pcloud[:3]
-    # sem = pcloud[:-1]
+    # pcd = np.asarray(pcloud.points)
+    # sem = (np.asarray(pcloud.colors) * 255.0).astype(np.uint8)
+    pcd = pcloud[:, :3]
+    sem = pcloud[:, -1]
     # new_sem = np.arange(len(sem))
     # for i, value in enumerate(sem): # 
     #     color_index = np.where((COLOR_PALETTE == value).all(axis = 1))
@@ -289,11 +295,8 @@ def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
 def main():
     eval_image = np.load(args.eval_img)
     depth_img = Image.open(args.depth_img)
-    depth_img_arr = np.array(depth_img)
-    depth_img_arr = calculate_carla_depth(depth_img_arr, np.zeros((depth_img.height, depth_img.width,)),
-                                          depth_img.height, depth_img.width)
-    pcloud = voxel_transform(eval_image, depth_img_arr)
-    voxelize_one(pcloud, "voxel" + str(args.eval_img))
+    file_name = "voxel" + os.path.basename(str(args.eval_img))
+    voxelize_one(depth_img, eval_image, file_name)
 
 
 if __name__ == "__main__":

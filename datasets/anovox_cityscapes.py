@@ -125,13 +125,16 @@ class AnoVox(data.Dataset):
             than one item. Otherwise target is a json object if target_type="polygon", else the image segmentation.
         """
         anomaly_color = [245,0,0]
+        # anomaly_color = (170, 120, 50)
+
+
         # image = np.array(Image.open(self.images[index]).convert('RGB'))
         image = np.array(Image.open(self.images[index]).convert('RGB'))
         target = np.array(Image.open(self.targets[index]))
         label = np.zeros((target.shape), dtype=np.uint8)[:,:,:1]
         label = np.squeeze(label)
         anomaly_mask = (target[:, :,None] == anomaly_color).all(-1).any(-1)
-        label[anomaly_mask] = 255
+        label[anomaly_mask] = 1
 
         # target[target == 255] = 19
 
