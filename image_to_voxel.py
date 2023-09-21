@@ -5,6 +5,49 @@ import argparse
 from numba import jit
 from PIL import Image
 
+COLOR_PALETTE = (
+        np.array(
+            [
+                (0, 0, 0),          # unlabeled     =   0u
+                (128, 64, 128),     # road          =   1u
+                (244, 35, 232),     # sidewalk      =   2u
+                (70, 70, 70),       # building      =   3u
+                (102, 102, 156),    # wall          =   4u
+                (190, 153, 153),    # fence         =   5u
+                (153, 153, 153),    # pole          =   6u
+                (250, 170, 30),     # traffic light =   7u
+                (220, 220, 0),      # traffic sign  =   8u
+                (107, 142, 35),     # vegetation    =   9u
+                (152, 251, 152),    # terrain       =  10u
+                (70, 130, 180),     # sky           =  11u
+                (220, 20, 60),      # pedestrian    =  12u
+                (255, 0, 0),        # rider         =  13u
+                (0, 0, 142),        # Car           =  14u
+                (0, 0, 70),         # truck         =  15u
+                (0, 60, 100),       # bus           =  16u
+                (0, 80, 100),       # train         =  17u
+                (0, 0, 230),        # motorcycle    =  18u
+                (119, 11, 32),      # bicycle       =  19u
+                (110, 190, 160),    # static        =  20u
+                (170, 120, 50),     # dynamic       =  21u
+                (55, 90, 80),       # other         =  22u
+                (45, 60, 150),      # water         =  23u
+                (157, 234, 50),     # road line     =  24u
+                (81, 0, 81),        # ground         = 25u
+                (150, 100, 100),    # bridge        =  26u
+                (230, 150, 140),    # rail track    =  27u
+                (180, 165, 180),    # guard rail    =  28u
+                (250, 128, 114),    # home          =  29u
+                (255, 36, 0),       # animal        =  30u
+                (224, 17, 95),      # nature        =  31u
+                (184, 15, 10),      # special       =  32u
+                (245, 0, 0),        # airplane      =  33u
+                (245, 0, 0),        # falling       =  34u
+            ]
+        )
+)
+
+WORLD_SIZE = [1000,1000,64]
 
 
 parser = argparse.ArgumentParser(description='OOD Evaluation')
@@ -16,7 +59,7 @@ parser.add_argument('--depth_img', type=str, # action='store_true',
                     help="""Name path to depth image""")
 parser.add_argument('--camera_fov', type=float,
                     help=""""Value for camera field of view""")
-parser.add_argument('--voxel_size', type=float,
+parser.add_argument('--voxel_resolution', type=float,
                     help=""""size for a single voxel""")
 
 
@@ -105,6 +148,137 @@ def voxel_transform(scores, depths):
     return depth_pcloud    
 
     voxel_pcd = o3d.geometry.PointCloud()
+
+
+def voxelize_one(merged_pcd, save_name, pipe=None):
+    offset_x = Definitions.bev_offset_forward * Definitions.bev_resolution
+    offset_z = Definitions.offset_z * args.voxel_resolution
+    voxel_points, semantics = voxel_filter(merged_pcd, args.voxel_resolution, WORLD_SIZE, [offset_x, 0, offset_z])
+    data = np.concatenate([voxel_points, semantics], axis=1) # [:, None]
+    # voxels = np.zeros(shape=cfg.voxel_size, dtype=np.uint8)
+    # voxels[voxel_points[:, 0], voxel_points[:, 1], voxel_points[:, 2]] = semantics
+    # csr_voxels = sp.csr_matrix(voxels.reshape(voxels.shape[0], -1))
+    np.save(f'{save_name}', data)
+    # np.save(f'{save_path}/voxel_coo/voxel_coo_{name}.npy', csr_voxels)
+
+    if pipe is not None:
+        pipe.send(['x'])
+
+
+def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
+    pcd = np.asarray(pcloud.points)
+    sem = (np.asarray(pcloud.colors) * 255.0).astype(np.uint8)
+    new_sem = np.arange(len(sem))
+    for i, value in enumerate(sem): # 
+        color_index = np.where((COLOR_PALETTE == value).all(axis = 1))
+        # print(value)
+        # for color in COLOR_PALETTE:
+        #     if (value == color).all():                
+        #         new_sem[i] = np.where((COLOR_PALETTE == value))[0][0]
+        # print(color_index)
+        new_sem[i] = color_index[0][0]
+    sem = new_sem
+    # unique, counts = np.unique(sem, return_counts = True)
+    # print(dict(zip(unique, counts)))
+    voxel_size = np.asarray(voxel_size)
+    offset = np.asarray(offset)
+    offset += voxel_resolution * voxel_size / 2
+    pcd_b = pcd + offset
+    idx = ((0 <= pcd_b) & (pcd_b < voxel_size * voxel_resolution)).all(axis=1)
+    pcd_b, sem_b = pcd_b[idx], sem[idx]
+
+    Dx, Dy, Dz = voxel_size
+    # compute index for every point in a voxel
+    hxyz, hmod = np.divmod(pcd_b, voxel_resolution)
+    h = hxyz[:, 0] + hxyz[:, 1] * Dx + hxyz[:, 2] * Dx * Dy
+
+    # h_n = np.nonzero(np.bincount(h.astype(np.int32)))
+    h_idx = np.argsort(h)
+    h, hxyz, sem_b, pcd_b, hmod = h[h_idx], hxyz[h_idx], sem_b[h_idx], pcd_b[h_idx], hmod[h_idx]
+    h_n, indices = np.unique(h, return_index=True)
+    n_f = h_n.shape[0]
+    n_all = h.shape[0]
+    voxels = np.zeros((n_f, 3), dtype=np.uint16)
+    semantics = np.zeros((n_f, 1), dtype=np.uint8)
+    # points_f = np.zeros((n_f, 3))
+    road_idx = np.where((COLOR_PALETTE == (157, 234, 50)).all(axis = 1))[0][0] # roadline 24u
+    # road_idx = np.where(LABEL_CLASS == 'roadlines')[0][0]
+    # voxels = []
+    # semantics = []
+    # points_f = []
+    for i in range(n_f):
+        # idx_ = (h == h_n[i])
+        idx_ = np.arange(indices[i], indices[i+1]) if i < n_f - 1 else np.arange(indices[i], n_all)
+        dis = np.sum(hmod[idx_] ** 2, axis=1)
+        semantic = sem_b[idx_][np.argmin(dis)] if not np.isin(sem_b[idx_], road_idx).any() else road_idx
+        # semantic = np.bincount(sem_b.squeeze()[idx_]).argmax() if not np.isin(sem_b[idx_], road_idx).any() else road_idx
+        voxels[i] = hxyz[idx_][0]
+        semantics[i] = semantic
+        # points_f[i] = pcd_b[idx_].mean(axis=0) - center
+        # points_f[i][2] += center[2] / 2
+        # voxels.append(hxyz[idx_][0])
+        # semantics.append(semantic)
+        # points_f.append(pcd_b[idx_].mean(axis=0) - center)
+    return voxels, semantics   
+
+
+
+def _voxelize_one(depth_file, lidar_file, cfg, save_name, pipe=None):
+    pcd, sem = merge_pcd(depth_file, lidar_file, cfg.camera_position, cfg.lidar_position, cfg.fov)
+    offset_x = cfg.bev_offset_forward * cfg.bev_resolution
+    offset_z = cfg.offset_z * cfg.voxel_resolution
+    voxel_points, semantics = voxel_filter(pcd, sem, cfg.voxel_resolution, cfg.voxel_size, [offset_x, 0, offset_z])
+    data = np.concatenate([voxel_points, semantics[:, None]], axis=1)
+    # voxels = np.zeros(shape=cfg.voxel_size, dtype=np.uint8)
+    # voxels[voxel_points[:, 0], voxel_points[:, 1], voxel_points[:, 2]] = semantics
+    # csr_voxels = sp.csr_matrix(voxels.reshape(voxels.shape[0], -1))
+    np.save(f'{save_name}', data)
+    # np.save(f'{save_path}/voxel_coo/voxel_coo_{name}.npy', csr_voxels)
+
+    if pipe is not None:
+        pipe.send(['x'])
+
+def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
+    voxel_size = np.asarray(voxel_size)
+    offset = np.asarray(offset)
+    offset += voxel_resolution * voxel_size / 2
+    pcd_b = pcd + offset
+    idx = ((0 <= pcd_b) & (pcd_b < voxel_size * voxel_resolution)).all(axis=1)
+    pcd_b, sem_b = pcd_b[idx], sem[idx]
+
+    Dx, Dy, Dz = voxel_size
+    # compute index for every point in a voxel
+    hxyz, hmod = np.divmod(pcd_b, voxel_resolution)
+    h = hxyz[:, 0] + hxyz[:, 1] * Dx + hxyz[:, 2] * Dx * Dy
+
+    # h_n = np.nonzero(np.bincount(h.astype(np.int32)))
+    h_idx = np.argsort(h)
+    h, hxyz, sem_b, pcd_b, hmod = h[h_idx], hxyz[h_idx], sem_b[h_idx], pcd_b[h_idx], hmod[h_idx]
+    h_n, indices = np.unique(h, return_index=True)
+    n_f = h_n.shape[0]
+    n_all = h.shape[0]
+    voxels = np.zeros((n_f, 3), dtype=np.uint16)
+    semantics = np.zeros((n_f, ), dtype=np.uint8)
+    # points_f = np.zeros((n_f, 3))
+    road_idx = np.where(LABEL_CLASS == 'roadlines')[0][0]
+    # voxels = []
+    # semantics = []
+    # points_f = []
+    for i in range(n_f):
+        # idx_ = (h == h_n[i])
+        idx_ = np.arange(indices[i], indices[i+1]) if i < n_f - 1 else np.arange(indices[i], n_all)
+        dis = np.sum(hmod[idx_] ** 2, axis=1)
+        semantic = sem_b[idx_][np.argmin(dis)] if not np.isin(sem_b[idx_], road_idx).any() else road_idx
+        # semantic = np.bincount(sem_b.squeeze()[idx_]).argmax() if not np.isin(sem_b[idx_], road_idx).any() else road_idx
+        voxels[i] = hxyz[idx_][0]
+        semantics[i] = semantic
+        # points_f[i] = pcd_b[idx_].mean(axis=0) - center
+        # points_f[i][2] += center[2] / 2
+        # voxels.append(hxyz[idx_][0])
+        # semantics.append(semantic)
+        # points_f.append(pcd_b[idx_].mean(axis=0) - center)
+
+    return voxels, semantics
 
 
 def main():
