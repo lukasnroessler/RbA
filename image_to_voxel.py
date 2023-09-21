@@ -5,6 +5,11 @@ import argparse
 from numba import jit
 from PIL import Image
 
+
+bev_offset_forward = 0 # in px
+bev_resolution = 0.2
+offset_z = 0 # in px
+
 COLOR_PALETTE = (
         np.array(
             [
@@ -77,14 +82,15 @@ def check_file_ending(path):
 
 
 @jit(nopython=True)  # Compile the function with Numba
-def calculate_carla_depth(depth_img):
-    depth_img = Image.open(depth_img)
-
+def calculate_carla_depth(depth_img, new_depth, height, width):
+    # depth_img = Image.open(depth_img)
+    depth_img_arr = new_depth
+    # height, width, _  = depth_img_arr.shape
     # Get the dimensions of the image
-    depth_img_arr = np.zeros((depth_img.height, depth_img.width,))
+    # depth_img_arr = np.zeros((depth_img.height, depth_img.width,))
     # Loop through each pixel in the depth_img
-    for row in range(depth_img.height):
-        for col in range(depth_img.width):
+    for row in range(height):
+        for col in range(width):
             pixel = depth_img[row, col]
             depth_img_arr[row, col] = 1000 * (pixel[0] + pixel[1] * 256 + pixel[2] * 256 * 256) / (
                 256 * 256 * 256 - 1
@@ -92,7 +98,7 @@ def calculate_carla_depth(depth_img):
     return depth_img_arr
 
 def voxel_transform(scores, depths):
-    height, width, _ = depths.shape
+    height, width = depths.shape
 
     camera_fov = args.camera_fov
     focal = width / (2.0 * np.tan(camera_fov * np.pi / 360.0))
@@ -119,10 +125,10 @@ def voxel_transform(scores, depths):
             x, y = (j - cx) * z / focal, (i - cy) * z / focal
             coordinate = [x,y,z]
 
-            if np.linalg.norm(coordinate) > 100:
-                continue
-            else:
-                point_list.append(coordinate)
+            # if np.linalg.norm(coordinate) > 100:
+            #     continue
+            # else:
+            point_list.append(coordinate)
                 # red, green, blue = (
                 #     semantic_color[0],
                 #     semantic_color[1],
@@ -131,7 +137,7 @@ def voxel_transform(scores, depths):
                 # point_color = [
                 #     i / 255.0 for i in [red, green, blue]
                 # ]  # format to o3d color values
-                anomaly_score_list.append(anomaly_score)
+            anomaly_score_list.append(anomaly_score)
 
     depth_pcloud = o3d.geometry.PointCloud()  # create point cloud object
     depth_pcloud.points = o3d.utility.Vector3dVector(
@@ -147,13 +153,10 @@ def voxel_transform(scores, depths):
     )  # rotate depth point cloud to fit lidar point cloud
     return depth_pcloud    
 
-    voxel_pcd = o3d.geometry.PointCloud()
-
-
-def voxelize_one(merged_pcd, save_name, pipe=None):
-    offset_x = Definitions.bev_offset_forward * Definitions.bev_resolution
-    offset_z = Definitions.offset_z * args.voxel_resolution
-    voxel_points, semantics = voxel_filter(merged_pcd, args.voxel_resolution, WORLD_SIZE, [offset_x, 0, offset_z])
+def voxelize_one(pcloud, save_name, pipe=None):
+    offset_x = bev_offset_forward * bev_resolution
+    offset_z = 0
+    voxel_points, semantics = voxel_filter(pcloud, args.voxel_resolution, WORLD_SIZE, [offset_x, 0, offset_z])
     data = np.concatenate([voxel_points, semantics], axis=1) # [:, None]
     # voxels = np.zeros(shape=cfg.voxel_size, dtype=np.uint8)
     # voxels[voxel_points[:, 0], voxel_points[:, 1], voxel_points[:, 2]] = semantics
@@ -168,16 +171,18 @@ def voxelize_one(merged_pcd, save_name, pipe=None):
 def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
     pcd = np.asarray(pcloud.points)
     sem = (np.asarray(pcloud.colors) * 255.0).astype(np.uint8)
-    new_sem = np.arange(len(sem))
-    for i, value in enumerate(sem): # 
-        color_index = np.where((COLOR_PALETTE == value).all(axis = 1))
-        # print(value)
-        # for color in COLOR_PALETTE:
-        #     if (value == color).all():                
-        #         new_sem[i] = np.where((COLOR_PALETTE == value))[0][0]
-        # print(color_index)
-        new_sem[i] = color_index[0][0]
-    sem = new_sem
+    # pcd = pcloud[:3]
+    # sem = pcloud[:-1]
+    # new_sem = np.arange(len(sem))
+    # for i, value in enumerate(sem): # 
+    #     color_index = np.where((COLOR_PALETTE == value).all(axis = 1))
+    #     # print(value)
+    #     # for color in COLOR_PALETTE:
+    #     #     if (value == color).all():                
+    #     #         new_sem[i] = np.where((COLOR_PALETTE == value))[0][0]
+    #     # print(color_index)
+    #     new_sem[i] = color_index[0][0]
+    # sem = new_sem
     # unique, counts = np.unique(sem, return_counts = True)
     # print(dict(zip(unique, counts)))
     voxel_size = np.asarray(voxel_size)
@@ -201,7 +206,7 @@ def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
     voxels = np.zeros((n_f, 3), dtype=np.uint16)
     semantics = np.zeros((n_f, 1), dtype=np.uint8)
     # points_f = np.zeros((n_f, 3))
-    road_idx = np.where((COLOR_PALETTE == (157, 234, 50)).all(axis = 1))[0][0] # roadline 24u
+    # road_idx = np.where((COLOR_PALETTE == (157, 234, 50)).all(axis = 1))[0][0] # roadline 24u
     # road_idx = np.where(LABEL_CLASS == 'roadlines')[0][0]
     # voxels = []
     # semantics = []
@@ -210,7 +215,7 @@ def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
         # idx_ = (h == h_n[i])
         idx_ = np.arange(indices[i], indices[i+1]) if i < n_f - 1 else np.arange(indices[i], n_all)
         dis = np.sum(hmod[idx_] ** 2, axis=1)
-        semantic = sem_b[idx_][np.argmin(dis)] if not np.isin(sem_b[idx_], road_idx).any() else road_idx
+        semantic = sem_b[idx_][np.argmin(dis)]  # if not np.isin(sem_b[idx_], road_idx).any() else road_idx
         # semantic = np.bincount(sem_b.squeeze()[idx_]).argmax() if not np.isin(sem_b[idx_], road_idx).any() else road_idx
         voxels[i] = hxyz[idx_][0]
         semantics[i] = semantic
@@ -283,11 +288,12 @@ def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
 
 def main():
     eval_image = np.load(args.eval_img)
-    depth_img_arr = calculate_carla_depth(args.depth_img)
-
-
-
-    return
+    depth_img = Image.open(args.depth_img)
+    depth_img_arr = np.array(depth_img)
+    depth_img_arr = calculate_carla_depth(depth_img_arr, np.zeros((depth_img.height, depth_img.width,)),
+                                          depth_img.height, depth_img.width)
+    pcloud = voxel_transform(eval_image, depth_img_arr)
+    voxelize_one(pcloud, "voxel" + str(args.eval_img))
 
 
 if __name__ == "__main__":
