@@ -58,6 +58,11 @@ WORLD_SIZE = [1000,1000,64]
 
 parser = argparse.ArgumentParser(description='OOD Evaluation')
 
+
+
+parser.add_argument('--dataset_path', type=str,
+                    help=""""path to anovox root""")
+
 parser.add_argument('--eval_img', type=str, 
                     help= """Name the path to the evaluated image as .npy file""")
 
@@ -69,6 +74,7 @@ parser.add_argument('--voxel_resolution', type=float,
                     help=""""size for a single voxel""")
 
 
+
 args = parser.parse_args()
 
 def check_file_ending(path):
@@ -77,6 +83,20 @@ def check_file_ending(path):
     if file_ending == "npy":
         return True
     return False
+
+
+def collect_depth_data():
+    root = args.dataset_path
+    depth_data = []
+
+    for scenario in os.listdir(root):
+        if scenario == 'Scenario_Configuration_Files':
+            continue
+        depth_dir = os.path.join(root, scenario, 'DEPTH_IMG')
+        for image in os.listdir(depth_dir):
+            depth_data.append(os.path.join(depth_dir, image))
+    
+    return sorted(depth_data)
 
 
 
@@ -152,12 +172,15 @@ def voxel_transform(scores, depths):
     )  # rotate depth point cloud to fit lidar point cloud
     o3d.visualization.draw_geometries([depth_pcloud])
     depth_points = np.asarray(depth_pcloud.points)
+    anomaly_score_list = np.asarray(anomaly_score_list)
+    print(np.amin(anomaly_score_list))
+    print(np.amax(anomaly_score_list))
     anomaly_score_list = np.reshape(np.array(anomaly_score_list), (len(anomaly_score_list), 1))
     return np.concatenate([depth_points, anomaly_score_list], axis=1)
 
-def img2pcd():
-    eval_image = np.load(args.eval_img)
-    depth_img = Image.open(args.depth_img)
+def img2pcd(score_img, depth_img):
+    eval_image = np.load(score_img)
+    depth_img = Image.open(depth_img)
     depth_img_arr = np.array(depth_img)
     depth_img_arr = calculate_carla_depth(depth_img_arr, np.zeros((depth_img.height, depth_img.width,)),
                                           depth_img.height, depth_img.width)
@@ -305,8 +328,23 @@ def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
 
 
 def main():
-    image_point_cloud, file_name = img2pcd()
-    voxelize_one(image_point_cloud, file_name)
+    # depth_img_dir = os.path.join(args.dataset_path, 'DEPTH_IMG')
+    scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
+    # scores_dir = '/home/tes_unreal/Desktop/Dataset_BA/...
+
+    scores_data = os.listdir(scores_dir)
+    depth_data = collect_depth_data()
+
+    output_path = '/home/lukasnroessler/Projects/RbA/voxelpreds'
+
+    os.mkdir(output_path)
+
+    for i, score in enumerate(scores_data):
+        score = os.path.join(scores_dir, score)
+        depth_img = depth_data[i]
+        image_point_cloud, file_name = img2pcd(score, depth_img)
+        file_path = os.path.join(output_path, file_name)
+        voxelize_one(image_point_cloud, file_path)
 
 
 if __name__ == "__main__":

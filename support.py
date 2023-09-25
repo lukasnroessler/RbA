@@ -15,7 +15,7 @@ from datasets.road_anomaly import RoadAnomaly
 from datasets.fishyscapes import FishyscapesLAF, FishyscapesStatic
 from datasets.segment_me_if_you_can import RoadAnomaly21, RoadObstacle21
 from datasets.lost_and_found import LostAndFound
-from datasets.anovox_cityscapes import AnoVox
+from datasets.anovox import AnoVox
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 from tqdm import tqdm
