@@ -1,0 +1,16 @@
+image_to_voxel
+
+
+evaluate_ood
+
+python evaluate_ood.py 
+--out_path /home/lukasnroessler/Projects/RbA/ood_out \
+--models_folder ckpts/ \
+--model_mode selective \
+--selected_models swin_b_1dl \
+--datasets_folder /home/lukasnroessler/Anomaly_Datasets/AnoVox \
+--dataset_mode selective \
+--selected_datasets anovox \
+--store_anomaly_scores \
+
+

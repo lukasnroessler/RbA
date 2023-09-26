@@ -63,14 +63,10 @@ parser = argparse.ArgumentParser(description='OOD Evaluation')
 parser.add_argument('--dataset_path', type=str,
                     help=""""path to anovox root""")
 
-parser.add_argument('--eval_img', type=str, 
-                    help= """Name the path to the evaluated image as .npy file""")
-
-parser.add_argument('--depth_img', type=str, # action='store_true',
-                    help="""Name path to depth image""")
-parser.add_argument('--camera_fov', type=float,
+parser.add_argument('--camera_fov', type=float, default=90.0,
                     help=""""Value for camera field of view""")
-parser.add_argument('--voxel_resolution', type=float,
+
+parser.add_argument('--voxel_resolution', type=float, default=0.5,
                     help=""""size for a single voxel""")
 
 
@@ -186,7 +182,7 @@ def img2pcd(score_img, depth_img):
                                           depth_img.height, depth_img.width)
     pcloud = voxel_transform(eval_image, depth_img_arr)
 
-    file_name = "voxel" + os.path.basename(str(args.eval_img))
+    file_name = "voxel" + os.path.basename(str(score_img))
 
     return pcloud, file_name
     
