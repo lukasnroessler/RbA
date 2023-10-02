@@ -166,7 +166,7 @@ def voxel_transform(scores, depths):
     depth_pcloud.rotate(
         r_matrix, center=(0, 0, 0)
     )  # rotate depth point cloud to fit lidar point cloud
-    o3d.visualization.draw_geometries([depth_pcloud])
+    # o3d.visualization.draw_geometries([depth_pcloud])
     depth_points = np.asarray(depth_pcloud.points)
     anomaly_score_list = np.asarray(anomaly_score_list)
     print(np.amin(anomaly_score_list))
@@ -205,7 +205,7 @@ def voxelize_one(pcloud, save_name, pipe=None):
         pipe.send(['x'])
 
 
-def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
+def voxel_filter(pcloud, voxel_resolution, grid_size, offset):
     # pcd = np.asarray(pcloud.points)
     # sem = (np.asarray(pcloud.colors) * 255.0).astype(np.uint8)
     pcd = pcloud[:, :3]
@@ -222,14 +222,14 @@ def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
     # sem = new_sem
     # unique, counts = np.unique(sem, return_counts = True)
     # print(dict(zip(unique, counts)))
-    voxel_size = np.asarray(voxel_size)
+    grid_size = np.asarray(grid_size)
     offset = np.asarray(offset)
-    offset += voxel_resolution * voxel_size / 2
+    offset += voxel_resolution * grid_size / 2
     pcd_b = pcd + offset
-    idx = ((0 <= pcd_b) & (pcd_b < voxel_size * voxel_resolution)).all(axis=1)
-    pcd_b, sem_b = pcd_b[idx], sem[idx]
+    idx = ((0 <= pcd_b) & (pcd_b < grid_size * voxel_resolution)).all(axis=1)
+    pcd_b, sem_b = pcd_b[idx], sem[idx] # limit point cloud to voxel grid size
 
-    Dx, Dy, Dz = voxel_size
+    Dx, Dy, Dz = grid_size
     # compute index for every point in a voxel
     hxyz, hmod = np.divmod(pcd_b, voxel_resolution)
     h = hxyz[:, 0] + hxyz[:, 1] * Dx + hxyz[:, 2] * Dx * Dy
@@ -241,7 +241,7 @@ def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
     n_f = h_n.shape[0]
     n_all = h.shape[0]
     voxels = np.zeros((n_f, 3), dtype=np.uint16)
-    semantics = np.zeros((n_f, 1), dtype=np.uint8)
+    semantics = np.zeros((n_f,1), dtype=np.float64)
     # points_f = np.zeros((n_f, 3))
     # road_idx = np.where((COLOR_PALETTE == (157, 234, 50)).all(axis = 1))[0][0] # roadline 24u
     # road_idx = np.where(LABEL_CLASS == 'roadlines')[0][0]
@@ -251,16 +251,19 @@ def voxel_filter(pcloud, voxel_resolution, voxel_size, offset):
     for i in range(n_f):
         # idx_ = (h == h_n[i])
         idx_ = np.arange(indices[i], indices[i+1]) if i < n_f - 1 else np.arange(indices[i], n_all)
-        dis = np.sum(hmod[idx_] ** 2, axis=1)
-        semantic = sem_b[idx_][np.argmin(dis)]  # if not np.isin(sem_b[idx_], road_idx).any() else road_idx
+        # dis = np.sum(hmod[idx_] ** 2, axis=1)
+
+        avg_score = np.mean(sem_b[idx_])
+
+        # semantic = sem_b[idx_][np.argmin(dis)]  # if not np.isin(sem_b[idx_], road_idx).any() else road_idx
         # semantic = np.bincount(sem_b.squeeze()[idx_]).argmax() if not np.isin(sem_b[idx_], road_idx).any() else road_idx
         voxels[i] = hxyz[idx_][0]
-        semantics[i] = semantic
-        # points_f[i] = pcd_b[idx_].mean(axis=0) - center
+        semantics[i] = avg_score
         # points_f[i][2] += center[2] / 2
         # voxels.append(hxyz[idx_][0])
         # semantics.append(semantic)
         # points_f.append(pcd_b[idx_].mean(axis=0) - center)
+    debug_set, counts = np.unique(semantics, return_counts=True)
     return voxels, semantics   
 
 
@@ -325,13 +328,14 @@ def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
 
 def main():
     # depth_img_dir = os.path.join(args.dataset_path, 'DEPTH_IMG')
-    scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
-    # scores_dir = '/home/tes_unreal/Desktop/Dataset_BA/...
+    # scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
+    scores_dir = '/home/tes_unreal/Desktop/BA/RbA/anomaly_scores/swin_b_1dl/anovox'
 
     scores_data = os.listdir(scores_dir)
     depth_data = collect_depth_data()
 
-    output_path = '/home/lukasnroessler/Projects/RbA/voxelpreds'
+    # output_path = '/home/lukasnroessler/Projects/RbA/voxelpreds'
+    output_path = '/home/tes_unreal/Desktop/BA/RbA/voxelpreds'
 
     os.mkdir(output_path)
 

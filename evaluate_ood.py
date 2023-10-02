@@ -222,9 +222,9 @@ def run_evaluations(model, dataset, model_name, dataset_name):
         os.makedirs(vis_path, exist_ok=True)
         for i in tqdm(range(len(anomaly_score)), desc=f"storing anomaly scores at {vis_path}"):
             
-            np.save(os.path.join(vis_path, f"score_{i}.npy"), anomaly_score[i])
+            np.save(os.path.join(vis_path, f"array_score_{i}.npy"), anomaly_score[i])
 
-            # mpimg.imsave(os.path.join(vis_path, f"score_{i}.png"), anomaly_score[i].squeeze(), cmap='viridis')
+            # mpimg.imsave(os.path.join(vis_path, f"img_score_{i}.png"), anomaly_score[i].squeeze(), cmap='viridis')
 
 
 
