@@ -141,9 +141,10 @@ class AnoVox(data.Dataset):
             tuple: (image, target) where target is a tuple of all target types if target_type is a list with more
             than one item. Otherwise target is a json object if target_type="polygon", else the image segmentation.
         """
-        # anomaly_color = [245,0,0]
-        # anomaly_color = (170, 120, 50)
-        anomaly_color = (110, 190, 160)
+        # anomaly_color = [245,0,0] # official anomaly color
+        # anomaly_color = (170, 120, 50) # brown, dynamic
+        # anomaly_color = (110, 190, 160) # turqoise, static
+        anomaly_color = [184,15,10] # special
 
         # image = np.array(Image.open(self.images[index]).convert('RGB'))
         image = np.array(Image.open(self.images[index]).convert('RGB'))
