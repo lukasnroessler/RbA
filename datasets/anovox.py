@@ -94,7 +94,8 @@ class AnoVox(data.Dataset):
 
                 target_file_name = image_file_name.replace('RGB', 'SEMANTIC')
                 self.targets.append(os.path.join(target_dir, target_file_name))
-
+        self.images = sorted(self.images)
+        self.targets = sorted(self.targets)
 
 
 

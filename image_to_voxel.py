@@ -61,13 +61,16 @@ parser = argparse.ArgumentParser(description='OOD Evaluation')
 
 
 parser.add_argument('--dataset_path', type=str,
-                    help=""""path to anovox root""")
+                    help=""""path to depth images""")
 
 parser.add_argument('--camera_fov', type=float, default=90.0,
                     help=""""Value for camera field of view""")
 
 parser.add_argument('--voxel_resolution', type=float, default=0.5,
                     help=""""size for a single voxel""")
+
+parser.add_argument('--depth_preds', default=False, action='store_true',
+                    help="""""set true for separate depth prediction instead of carla ground truth""")
 
 
 
@@ -81,7 +84,7 @@ def check_file_ending(path):
     return False
 
 
-def collect_depth_data():
+def collect_carla_depth_img():
     root = args.dataset_path
     depth_data = []
 
@@ -112,7 +115,7 @@ def calculate_carla_depth(depth_img, new_depth, height, width):
             )
     return depth_img_arr
 
-def voxel_transform(scores, depths):
+def transform_pcd(scores, depths):
     height, width = depths.shape
 
     camera_fov = args.camera_fov
@@ -144,14 +147,14 @@ def voxel_transform(scores, depths):
                 continue
             else:
                 point_list.append(coordinate)
-                # red, green, blue = (
-                #     semantic_color[0],
-                #     semantic_color[1],
-                #     semantic_color[2],
-                # )
-                # point_color = [
-                #     i / 255.0 for i in [red, green, blue]
-                # ]  # format to o3d color values
+            # red, green, blue = (
+            #     semantic_color[0],
+            #     semantic_color[1],
+            #     semantic_color[2],
+            # )
+            # point_color = [
+            #     i / 255.0 for i in [red, green, blue]
+            # ]  # format to o3d color values
                 anomaly_score_list.append(anomaly_score)
 
     depth_pcloud = o3d.geometry.PointCloud()  # create point cloud object
@@ -176,11 +179,16 @@ def voxel_transform(scores, depths):
 
 def img2pcd(score_img, depth_img):
     eval_image = np.load(score_img)
-    depth_img = Image.open(depth_img)
-    depth_img_arr = np.array(depth_img)
-    depth_img_arr = calculate_carla_depth(depth_img_arr, np.zeros((depth_img.height, depth_img.width,)),
-                                          depth_img.height, depth_img.width)
-    pcloud = voxel_transform(eval_image, depth_img_arr)
+
+    if args.depth_preds:
+        depth_img_array = np.load(depth_img)
+    else:
+        depth_img = Image.open(depth_img)
+    
+        depth_img_array = calculate_carla_depth(np.array(depth_img), np.zeros((depth_img.height, depth_img.width,)),
+                                            depth_img.height, depth_img.width)
+
+    pcloud = transform_pcd(eval_image, depth_img_array)
 
     file_name = "voxel" + os.path.basename(str(score_img))
 
@@ -263,7 +271,7 @@ def voxel_filter(pcloud, voxel_resolution, grid_size, offset):
         # voxels.append(hxyz[idx_][0])
         # semantics.append(semantic)
         # points_f.append(pcd_b[idx_].mean(axis=0) - center)
-    debug_set, counts = np.unique(semantics, return_counts=True)
+    # debug_set, counts = np.unique(semantics, return_counts=True)
     return voxels, semantics   
 
 
@@ -328,14 +336,21 @@ def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
 
 def main():
     # depth_img_dir = os.path.join(args.dataset_path, 'DEPTH_IMG')
-    # scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
-    scores_dir = '/home/tes_unreal/Desktop/BA/RbA/anomaly_scores/swin_b_1dl/anovox'
+    scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
+    # scores_dir = '/home/tes_unreal/Desktop/BA/RbA/anomaly_scores/swin_b_1dl/anovox'
 
     scores_data = os.listdir(scores_dir)
-    depth_data = collect_depth_data()
 
-    # output_path = '/home/lukasnroessler/Projects/RbA/voxelpreds'
-    output_path = '/home/tes_unreal/Desktop/BA/RbA/voxelpreds'
+    if args.depth_preds:
+        depth_data = []
+        for depth_pred in sorted(os.listdir(args.dataset_path)):
+            depth_data.append(os.path.join(args.dataset_path, depth_pred))
+    else:
+        depth_data = collect_carla_depth_img()
+    
+
+    output_path = '/home/lukasnroessler/Projects/RbA/voxelpreds'
+    # output_path = '/home/tes_unreal/Desktop/BA/RbA/voxelpreds'
 
     os.mkdir(output_path)
 

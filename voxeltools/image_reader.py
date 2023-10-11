@@ -101,6 +101,7 @@ def cut(image):
     image_arr = np.asarray(image)
     image_arr = np.copy(image_arr)[:,:,:3]
     print(image_arr.shape)
+    image_arr = image_arr[:,:,::-1]
     # image = Image.fromarray(image_arr)
     # ("/home/tes_unreal/Desktop/BA/RbA/cutimage.png", image_arr)
     # image.show()
@@ -117,21 +118,23 @@ def mask(input_path):
 
 
 def color_semantics(image):
-    img = cv2.imread(image,-1)
+    # img = cv2.imread(image,-1)
+    img = Image.open(image)
+    img = np.asarray(img)
     height, width, _ = img.shape
     depth, semantic, _ = read_clearml_img(img)
     semantic_img = LABEL_COLORS[semantic]
     semantic_img = semantic_img.reshape((height,width,3)).astype(np.uint8)
-    semantic_img = cv2.cvtColor(semantic_img, cv2.COLOR_BGR2RGB)
-    cv2.imshow("image", semantic_img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # semantic_img = cv2.cvtColor(semantic_img, cv2.COLOR_BGR2RGB)
+
 
 if __name__ == "__main__":
     inputs = sys.argv[1:]
     image_properties(inputs)
-    # labelimg = cut(Image.open(inputs[0]))
-    color_semantics(inputs[0])
+    labelimg = cut(Image.open(inputs[0]))
+    img = Image.fromarray(labelimg)
+    img.show()
+    # color_semantics(inputs[0])
     # img = cv2.imread(inputs[0],-1)
 
 

@@ -1,6 +1,7 @@
 image_to_voxel
 
 
+
 evaluate_ood
 
 python evaluate_ood.py 
@@ -8,7 +9,7 @@ python evaluate_ood.py
 --models_folder ckpts/ \
 --model_mode selective \
 --selected_models swin_b_1dl \
---datasets_folder /home/lukasnroessler/Anomaly_Datasets/AnoVox \
+--datasets_folder /home/lukasnroessler/Anomaly_Datasets \
 --dataset_mode selective \
 --selected_datasets anovox \
 --store_anomaly_scores \
