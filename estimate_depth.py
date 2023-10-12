@@ -201,12 +201,22 @@ def main():
 
         new_file_name = 'depth_pred_' + img_id
 
-        save_pil(os.path.join(output_path, new_file_name), pred)
+        # pred = 1 / pred
+        
+        # pred = np.divide(1, pred, out=np.zeros_like(pred), where=pred!=0)
+        # pred = np.ones_like(pred) - pred
+        # save_pil(os.path.join(output_path, new_file_name), pred)
 
 
-        depth_map_normalized = (pred - pred.min()) / (pred.max() - pred.min()) * 1000
+        depth_map_normalized = (pred - pred.min()) / (pred.max() - pred.min())
 
-        depth_map_normalized = depth_map_normalized.astype("float128")
+        # depth_map_normalized = np.ones_like(depth_map_normalized) - depth_map_normalized
+
+        depth_map_normalized = 1 / depth_map_normalized
+
+        depth_map_normalized = depth_map_normalized * 255
+
+        depth_map_normalized = depth_map_normalized.astype("uint8")
 
         np.save(os.path.join(output_path, new_file_name), depth_map_normalized)
 
