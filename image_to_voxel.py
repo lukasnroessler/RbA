@@ -143,10 +143,10 @@ def transform_pcd(scores, depths):
             x, y = (j - cx) * z / focal, (i - cy) * z / focal
             coordinate = [x,y,z]
 
-            if np.linalg.norm(coordinate) > 100:
-                continue
-            else:
-                point_list.append(coordinate)
+            # if np.linalg.norm(coordinate) > 100:
+            #     continue
+            # else:
+            point_list.append(coordinate)
             # red, green, blue = (
             #     semantic_color[0],
             #     semantic_color[1],
@@ -155,7 +155,7 @@ def transform_pcd(scores, depths):
             # point_color = [
             #     i / 255.0 for i in [red, green, blue]
             # ]  # format to o3d color values
-                anomaly_score_list.append(anomaly_score)
+            anomaly_score_list.append(anomaly_score)
 
     depth_pcloud = o3d.geometry.PointCloud()  # create point cloud object
     depth_pcloud.points = o3d.utility.Vector3dVector(
@@ -177,22 +177,64 @@ def transform_pcd(scores, depths):
     anomaly_score_list = np.reshape(np.array(anomaly_score_list), (len(anomaly_score_list), 1))
     return np.concatenate([depth_points, anomaly_score_list], axis=1)
 
+
+def transform_pcd_o3d(depth_img_path, eval_img):
+    # depth_img_pil = Image.open(depth_img_path)
+    # height, width = depth_img_pil.height, depth_img_pil.width
+
+    depth_img_array = np.load(depth_img_path)
+    # depth_img_array = depth_img_array.astype(np.uint16)
+    height, width = depth_img_array.shape
+    print("dtype:", depth_img_array.dtype)
+    # depth_img = o3d.io.read_image(depth_img_path)
+    depth_img = o3d.geometry.Image(depth_img_array)
+
+
+    camera_fov = args.camera_fov
+    focal = width / (2.0 * np.tan(camera_fov * np.pi / 360.0))
+
+    # In this case Fx and Fy are the same since the pixel aspect
+    # ratio is 1
+    cx = width / 2.0  # from camera projection matrix
+    cy = height / 2.0
+
+    intrinsic = o3d.camera.PinholeCameraIntrinsic(width, height, focal,focal, cx, cy)
+    intrinsic.intrinsic_matrix = [[focal, 0, cx], [0, focal, cy], [0, 0, 1]]
+    cam = o3d.camera.PinholeCameraParameters()
+    cam.intrinsic = intrinsic
+
+    # pcloud = o3d.geometry.PointCloud()
+    o3d.visualization.draw_geometries([depth_img])
+
+
+    # cam.extrinsic = np.array([[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 1.]])
+    pcloud = o3d.geometry.PointCloud().create_from_depth_image(depth_img, cam.intrinsic)
+    print(pcloud)
+    o3d.visualization.draw_geometries([pcloud])
+
+
+
+
+
 def img2pcd(score_img, depth_img):
     eval_image = np.load(score_img)
 
     if args.depth_preds:
-        depth_img_array = np.load(depth_img)
+        # depth_img_array = np.load(depth_img)
+        # depth_img_ = o3d.io.read_image(depth_img)
+        transform_pcd_o3d(depth_img, eval_image)
+
     else:
         depth_img = Image.open(depth_img)
     
         depth_img_array = calculate_carla_depth(np.array(depth_img), np.zeros((depth_img.height, depth_img.width,)),
                                             depth_img.height, depth_img.width)
 
-    pcloud = transform_pcd(eval_image, depth_img_array)
+        pcloud = transform_pcd(eval_image, depth_img_array)
 
     file_name = "voxel" + os.path.basename(str(score_img))
 
-    return pcloud, file_name
+    # return pcloud, file_name
     
 
 

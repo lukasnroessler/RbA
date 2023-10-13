@@ -23,6 +23,10 @@ parser = argparse.ArgumentParser(description='OOD Evaluation')
 parser.add_argument('--dataset_path', type=str,
                     help=""""path to anovox root""")
 
+parser.add_argument('--camera_fov', type=float, default=90.0,
+                    help=""""Value for camera field of view""")
+
+
 
 output_path = "/home/lukasnroessler/Projects/RbA/VoxeldepthPreds"
 
@@ -198,6 +202,9 @@ def main():
         
         pred = depth_prediction(img)
 
+        height, width = pred.shape
+        focal_length = width / (2.0 * np.tan(args.camera_fov * np.pi / 360.0))
+
 
         new_file_name = 'depth_pred_' + img_id
 
@@ -208,17 +215,24 @@ def main():
         # save_pil(os.path.join(output_path, new_file_name), pred)
 
 
-        depth_map_normalized = (pred - pred.min()) / (pred.max() - pred.min())
+        # pred = focal_length / pred
+
+        pred = focal_length / pred # 
+
+        depth_map_normalized = (pred - pred.min()) / (pred.max() - pred.min()) 
+
+
 
         # depth_map_normalized = np.ones_like(depth_map_normalized) - depth_map_normalized
 
-        depth_map_normalized = 1 / depth_map_normalized
 
         depth_map_normalized = depth_map_normalized * 255
 
-        depth_map_normalized = depth_map_normalized.astype("uint8")
+        # depth_map_normalized = depth_map_normalized.astype(np.uint8)
 
         np.save(os.path.join(output_path, new_file_name), depth_map_normalized)
+        # np.save(os.path.join(output_path, new_file_name), pred)
+
 
         
 
