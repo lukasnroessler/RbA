@@ -115,6 +115,7 @@ def calculate_carla_depth(depth_img, new_depth, height, width):
             )
     return depth_img_arr
 
+
 def transform_pcd(scores, depths):
     height, width = depths.shape
 
@@ -143,10 +144,10 @@ def transform_pcd(scores, depths):
             x, y = (j - cx) * z / focal, (i - cy) * z / focal
             coordinate = [x,y,z]
 
-            # if np.linalg.norm(coordinate) > 100:
-            #     continue
-            # else:
-            point_list.append(coordinate)
+            if np.linalg.norm(coordinate) > 100:
+                continue
+            else:
+                point_list.append(coordinate)
             # red, green, blue = (
             #     semantic_color[0],
             #     semantic_color[1],
@@ -220,9 +221,10 @@ def img2pcd(score_img, depth_img):
     eval_image = np.load(score_img)
 
     if args.depth_preds:
-        # depth_img_array = np.load(depth_img)
+        depth_img_array = np.load(depth_img)
+        pcloud = transform_pcd(eval_image, depth_img_array)
         # depth_img_ = o3d.io.read_image(depth_img)
-        transform_pcd_o3d(depth_img, eval_image)
+        # transform_pcd_o3d(depth_img, eval_image)
 
     else:
         depth_img = Image.open(depth_img)
@@ -234,7 +236,7 @@ def img2pcd(score_img, depth_img):
 
     file_name = "voxel" + os.path.basename(str(score_img))
 
-    # return pcloud, file_name
+    return pcloud, file_name
     
 
 
@@ -381,7 +383,7 @@ def main():
     scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
     # scores_dir = '/home/tes_unreal/Desktop/BA/RbA/anomaly_scores/swin_b_1dl/anovox'
 
-    scores_data = os.listdir(scores_dir)
+    scores_data = sorted(os.listdir(scores_dir))
 
     if args.depth_preds:
         depth_data = []
