@@ -60,7 +60,7 @@ parser = argparse.ArgumentParser(description='OOD Evaluation')
 
 
 
-parser.add_argument('--dataset_path', type=str,
+parser.add_argument('--dataset_path', type=str, default='/home/lukasnroessler/Anomaly_Datasets/AnoVox',
                     help=""""path to depth images""")
 
 parser.add_argument('--camera_fov', type=float, default=90.0,
@@ -95,7 +95,12 @@ def collect_carla_depth_img():
         for image in os.listdir(depth_dir):
             depth_data.append(os.path.join(depth_dir, image))
     
-    return sorted(depth_data)
+    def sorter(file_paths):
+        identifier = (os.path.basename(file_paths).split('.')[0]).split('_')[-1]
+        return int(identifier)
+    depth_data.sort(key=sorter)
+    
+    return depth_data
 
 
 
