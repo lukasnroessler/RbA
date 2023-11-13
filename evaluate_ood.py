@@ -221,10 +221,17 @@ def run_evaluations(model, dataset, model_name, dataset_name):
         vis_path = os.path.join(f"anomaly_scores/{model_name}/{dataset_name}")
         os.makedirs(vis_path, exist_ok=True)
         for i in tqdm(range(len(anomaly_score)), desc=f"storing anomaly scores at {vis_path}"):
-            
-            np.save(os.path.join(vis_path, f"array_score_{i}.npy"), anomaly_score[i])
 
-            # mpimg.imsave(os.path.join(vis_path, f"img_score_{i}.png"), anomaly_score[i].squeeze(), cmap='viridis')
+            # for evaluation set anomaly scores between 1 and 0
+            # change formula to 1 - x
+            # set all negative values to zero
+            
+            anomaly_score_i = anomaly_score[i] + 1
+            anomaly_score_i = anomaly_score_i.clip(min=0)
+
+            np.save(os.path.join(vis_path, "array_score_{}.npy".format(str(i).rjust(10, '0'))), anomaly_score_i)
+
+            mpimg.imsave(os.path.join(vis_path, "img_score_{}.png".format(str(i).rjust(10, '0'))), anomaly_score_i.squeeze(), cmap='viridis')
 
 
 
@@ -265,7 +272,7 @@ def main():
 
         config_path = os.path.join(experiment_path, 'config.yaml')
         model_path= os.path.join(experiment_path, 'model_final.pth')
-
+    
         if current_result_exists(model_name):
             print(f"Skipping {model_name} because results already exist, if you want to re-run, delete the results.pkl file")
             continue

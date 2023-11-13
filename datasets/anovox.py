@@ -94,8 +94,13 @@ class AnoVox(data.Dataset):
 
                 target_file_name = image_file_name.replace('RGB', 'SEMANTIC')
                 self.targets.append(os.path.join(target_dir, target_file_name))
-        self.images = sorted(self.images)
-        self.targets = sorted(self.targets)
+
+        def sorter(file_path):
+            identifier = (os.path.basename(file_path).split('.')[0]).split('_')[-1]
+            return int(identifier)
+        
+        self.images = sorted(self.images, key=sorter)
+        self.targets = sorted(self.targets, key=sorter)
 
 
 
@@ -142,10 +147,10 @@ class AnoVox(data.Dataset):
             tuple: (image, target) where target is a tuple of all target types if target_type is a list with more
             than one item. Otherwise target is a json object if target_type="polygon", else the image segmentation.
         """
-        # anomaly_color = [245,0,0] # official anomaly color
+        anomaly_color = [245,0,0] # official anomaly color
         # anomaly_color = (170, 120, 50) # brown, dynamic
         # anomaly_color = (110, 190, 160) # turqoise, static
-        anomaly_color = [184,15,10] # special
+        # anomaly_color = [184,15,10] # special
 
         # image = np.array(Image.open(self.images[index]).convert('RGB'))
         image = np.array(Image.open(self.images[index]).convert('RGB'))

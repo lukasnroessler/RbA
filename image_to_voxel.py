@@ -79,10 +79,7 @@ args = parser.parse_args()
 def check_file_ending(path):
     file_ending = path.split(".")[-1]
     print("     ending", file_ending)
-    if file_ending == "npy":
-        return True
-    return False
-
+    return file_ending == "npy"
 
 def collect_carla_depth_img():
     root = args.dataset_path
@@ -177,7 +174,7 @@ def transform_pcd(scores, depths):
     )  # rotate depth point cloud to fit lidar point cloud
     # o3d.visualization.draw_geometries([depth_pcloud])
     depth_points = np.asarray(depth_pcloud.points)
-    anomaly_score_list = np.asarray(anomaly_score_list)
+    anomaly_score_list = np.asarray(anomaly_score_list) # + 1
     print(np.amin(anomaly_score_list))
     print(np.amax(anomaly_score_list))
     anomaly_score_list = np.reshape(np.array(anomaly_score_list), (len(anomaly_score_list), 1))
@@ -216,7 +213,7 @@ def transform_pcd_o3d(depth_img_path, eval_img):
     # cam.extrinsic = np.array([[0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 0.], [0., 0., 0., 1.]])
     pcloud = o3d.geometry.PointCloud().create_from_depth_image(depth_img, cam.intrinsic)
     print(pcloud)
-    o3d.visualization.draw_geometries([pcloud])
+    # o3d.visualization.draw_geometries([pcloud])
 
 
 
