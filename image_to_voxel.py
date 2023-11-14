@@ -71,6 +71,8 @@ parser.add_argument('--voxel_resolution', type=float, default=0.5,
 
 parser.add_argument('--depth_preds', default=False, action='store_true',
                     help="""""set true for separate depth prediction instead of carla ground truth""")
+parser.add_argument('--mask', type=str,
+                    help="""path of image to mask region of interest""")
 
 
 
@@ -91,12 +93,12 @@ def collect_carla_depth_img():
         depth_dir = os.path.join(root, scenario, 'DEPTH_IMG')
         for image in os.listdir(depth_dir):
             depth_data.append(os.path.join(depth_dir, image))
-    
+
     def sorter(file_paths):
         identifier = (os.path.basename(file_paths).split('.')[0]).split('_')[-1]
         return int(identifier)
     depth_data.sort(key=sorter)
-    
+
     return depth_data
 
 
@@ -118,10 +120,10 @@ def calculate_carla_depth(depth_img, new_depth, height, width):
     return depth_img_arr
 
 
-def transform_pcd(scores, depths):
+def transform_to_pcd(scores, depths, mask=None, camera_fov = args.camera_fov):
     height, width = depths.shape
 
-    camera_fov = args.camera_fov
+    # camera_fov = args.camera_fov
     focal = width / (2.0 * np.tan(camera_fov * np.pi / 360.0))
 
     # In this case Fx and Fy are the same since the pixel aspect
@@ -137,6 +139,8 @@ def transform_pcd(scores, depths):
     for i in range(height):
         for j in range(width):
             z = depths[i,j]
+            if mask is not None and not mask[i][j]:
+                continue
             anomaly_score = scores[i][j]
             # depth encoded in rgb values. For further information take a look at carla docs
             # depth_color[2] = B
@@ -219,27 +223,27 @@ def transform_pcd_o3d(depth_img_path, eval_img):
 
 
 
-def img2pcd(score_img, depth_img):
+def img2pcd(score_img, depth_img, mask):
     eval_image = np.load(score_img)
 
     if args.depth_preds:
         depth_img_array = np.load(depth_img)
-        pcloud = transform_pcd(eval_image, depth_img_array)
+        pcloud = transform_to_pcd(eval_image, depth_img_array)
         # depth_img_ = o3d.io.read_image(depth_img)
         # transform_pcd_o3d(depth_img, eval_image)
 
     else:
         depth_img = Image.open(depth_img)
-    
+
         depth_img_array = calculate_carla_depth(np.array(depth_img), np.zeros((depth_img.height, depth_img.width,)),
                                             depth_img.height, depth_img.width)
 
-        pcloud = transform_pcd(eval_image, depth_img_array)
+        pcloud = transform_to_pcd(eval_image, depth_img_array, mask)
 
     file_name = "voxel" + os.path.basename(str(score_img))
 
     return pcloud, file_name
-    
+
 
 
 
@@ -265,11 +269,11 @@ def voxel_filter(pcloud, voxel_resolution, grid_size, offset):
     pcd = pcloud[:, :3]
     sem = pcloud[:, -1]
     # new_sem = np.arange(len(sem))
-    # for i, value in enumerate(sem): # 
+    # for i, value in enumerate(sem): #
     #     color_index = np.where((COLOR_PALETTE == value).all(axis = 1))
     #     # print(value)
     #     # for color in COLOR_PALETTE:
-    #     #     if (value == color).all():                
+    #     #     if (value == color).all():
     #     #         new_sem[i] = np.where((COLOR_PALETTE == value))[0][0]
     #     # print(color_index)
     #     new_sem[i] = color_index[0][0]
@@ -318,7 +322,7 @@ def voxel_filter(pcloud, voxel_resolution, grid_size, offset):
         # semantics.append(semantic)
         # points_f.append(pcd_b[idx_].mean(axis=0) - center)
     # debug_set, counts = np.unique(semantics, return_counts=True)
-    return voxels, semantics   
+    return voxels, semantics
 
 
 
@@ -382,8 +386,8 @@ def _voxel_filter(pcd, sem, voxel_resolution, voxel_size, offset):
 
 def main():
     # depth_img_dir = os.path.join(args.dataset_path, 'DEPTH_IMG')
-    scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
-    # scores_dir = '/home/tes_unreal/Desktop/BA/RbA/anomaly_scores/swin_b_1dl/anovox'
+    # scores_dir = '/home/lukasnroessler/Projects/RbA/anomaly_scores/swin_b_1dl/anovox'
+    scores_dir = '/home/tes_unreal/Desktop/BA/RbA/anomaly_scores/swin_b_1dl/anovox'
 
     scores_data = sorted(os.listdir(scores_dir))
 
@@ -393,17 +397,22 @@ def main():
             depth_data.append(os.path.join(args.dataset_path, depth_pred))
     else:
         depth_data = collect_carla_depth_img()
-    
 
-    output_path = '/home/lukasnroessler/Projects/RbA/voxelpreds'
-    # output_path = '/home/tes_unreal/Desktop/BA/RbA/voxelpreds'
+
+    # output_path = '/home/lukasnroessler/Projects/RbA/voxelpreds'
+    output_path = '/home/tes_unreal/Desktop/BA/RbA/voxelpreds'
 
     os.mkdir(output_path)
+
+    if args.mask:
+        roi_mask = np.array(Image.open(args.mask))
+    else:
+        roi_mask = None
 
     for i, score in enumerate(scores_data):
         score = os.path.join(scores_dir, score)
         depth_img = depth_data[i]
-        image_point_cloud, file_name = img2pcd(score, depth_img)
+        image_point_cloud, file_name = img2pcd(score, depth_img, mask=roi_mask)
         file_path = os.path.join(output_path, file_name)
         voxelize_one(image_point_cloud, file_path)
 

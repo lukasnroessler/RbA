@@ -32,7 +32,7 @@ def open_npy(file_path):
 
         voxel_data = np.load(file_path)
         voxel_points = voxel_data[:,:3]
-        voxel_colors = voxel_data[:,3:] + 1
+        voxel_colors = voxel_data[:,3:] # + 1
         # print(voxel_points)
         # voxel_colors = np.squeeze(Definitions.COLOR_PALETTE[voxel_colors]) / 255.0
         voxel_colors = np.c_[voxel_colors, np.zeros((voxel_colors.size,2))]

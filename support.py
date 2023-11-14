@@ -23,6 +23,10 @@ from tqdm import tqdm
 from typing import Callable
 from sklearn.metrics import roc_curve, auc, average_precision_score
 from ood_metrics import fpr_at_95_tpr
+from PIL import Image
+import matplotlib.image as mpimg
+
+
 
 
 def get_datasets(datasets_folder):
@@ -77,7 +81,7 @@ def get_datasets(datasets_folder):
     transform = A.Compose([
         ToTensorV2()
     ])
-    
+
     # Road Anomaly 21
     transform_ra_21 = A.Compose([
         A.Resize(height=720, width=1280),
@@ -94,29 +98,29 @@ def get_datasets(datasets_folder):
         # fs_static_v2=FishyscapesStatic(hparams=fishyscapes_static_config, transforms=transform, version=2),
         # road_anomaly_21=RoadAnomaly21(hparams=road_anomaly_21_config, transforms=transform_ra_21),
         # road_obstacles=RoadObstacle21(road_obstacle_21_config, transforms=transform),
-        # lost_and_found=LostAndFound(laf_config, transform) 
+        # lost_and_found=LostAndFound(laf_config, transform)
     )
 
     return DATASETS
 
 
 def get_logits_plus(model, x, **kwargs):
-    
+
     with torch.no_grad():
         out = model([{"image": x[0].cuda()}], **kwargs)
-    
+
     if "return_aux" in kwargs and kwargs["return_aux"]:
         return out[0][0]["sem_seg"].unsqueeze(0), out[1]
 
     return out[0]['sem_seg'].unsqueeze(0)
 
 def get_logits(model, x, **kwargs):
-    
+
     with torch.no_grad():
         out = model([{"image": x[0].cuda()}])
-    
+
     return out[0]['sem_seg'].unsqueeze(0)
-    
+
 def get_neg_logit_sum(model, x, **kwargs):
     """
     This function computes the negative logits sum of a given logits map as an anomaly score.
@@ -133,21 +137,21 @@ def get_neg_logit_sum(model, x, **kwargs):
         out = model([{"image": x[0].cuda()}])
 
     logits = out[0]['sem_seg']
-    
+
     return -logits.sum(dim=0)
 
 
 def get_RbA(model, x, **kwargs):
-    
+
     with torch.no_grad():
         out = model([{"image": x[0].cuda()}])
 
     logits = out[0]['sem_seg']
-    
+
     return -logits.tanh().sum(dim=0)
 
 def logistic(x, k=1, x0=0, L=1):
-    
+
     return L/(1 + torch.exp(-k*(x-x0)))
 
 def show_mask(mask, ax, random_color=False):
@@ -158,17 +162,17 @@ def show_mask(mask, ax, random_color=False):
     h, w = mask.shape[-2:]
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     ax.imshow(mask_image)
-    
+
 def show_points(coords, labels, ax, marker_size=375):
     pos_points = coords[labels==1]
     neg_points = coords[labels==0]
     ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
-    ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)   
-    
+    ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
+
 def show_box(box, ax):
     x0, y0 = box[0], box[1]
     w, h = box[2] - box[0], box[3] - box[1]
-    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0,0,0,0), lw=2))    
+    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor='green', facecolor=(0,0,0,0), lw=2))
 
 def show_anns(anns, strength=0.35):
     if len(anns) == 0:
@@ -192,17 +196,17 @@ def get_seg_colormap(preds, colors):
     """
     H, W = preds.shape
     color_map = torch.zeros((H, W, 3)).long()
-    
+
     for i in range(len(colors)):
         mask = (preds == i)
         if mask.sum() == 0:
             continue
         color_map[mask, :] = torch.tensor(colors[i])
-    
+
     return color_map
 
 def proc_img(img):
-    
+
     if isinstance(img, torch.Tensor):
         ready_img = img.clone()
         if len(ready_img.shape) == 3 and ready_img.shape[0] == 3:
@@ -220,7 +224,7 @@ def proc_img(img):
     return ready_img
 
 def resize_mask(m, shape):
-    
+
     m = F.interpolate(
         m,
         size=(shape[0], shape[1]),
@@ -358,12 +362,14 @@ class OODEvaluator:
     def compute_anomaly_scores(
         self,
         loader,
+        insert_roi,
         device=torch.device('cpu'),
         return_preds=False,
         use_gaussian_smoothing=False,
-        upper_limit=450
+        upper_limit=450,
     ):
-
+        if insert_roi:
+            mask_img = Image.open(insert_roi)
         anomaly_score = []
         ood_gts = []
         predictions = []
@@ -380,7 +386,7 @@ class OODEvaluator:
             x = x.to(device)
             y = y.to(device)
 
-            ood_gts.extend([y.cpu().numpy()])
+            # ood_gts.extend([y.cpu().numpy()])
 
             score = self.get_anomaly_score(x)  # -> (H, W)
 
@@ -392,7 +398,22 @@ class OODEvaluator:
                 _, preds = logits[:, :19, :, :].max(dim=1)
                 predictions.extend([preds.cpu().numpy()])
 
-            anomaly_score.extend([score.cpu().numpy()])
+            # anomaly_score.extend([score.cpu().numpy()])
+            # overwritten
+            ood_gt = y.cpu().numpy()
+            scores = score.cpu().numpy()
+
+            if insert_roi: #
+                roi = np.array(mask_img)
+                roi_ = np.expand_dims(roi, axis=0)
+                ood_gt = ood_gt[roi_]
+                scores = scores[roi]
+
+            ood_gts.extend([ood_gt])
+            anomaly_score.extend([scores])
+
+
+
 
         ood_gts = np.array(ood_gts)
         anomaly_score = np.array(anomaly_score)

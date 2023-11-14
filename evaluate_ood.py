@@ -39,17 +39,17 @@ parser.add_argument('--datasets_folder', type=str, default='./',
 parser.add_argument('--models_folder', type=str, default='ckpts/',
                     help='the path that contains the models to be evaluated')
 parser.add_argument("--store_anomaly_scores", action='store_true',
-                    help="""If passed, store anomaly score maps that are extracted in full evaluation. 
-                    The map will be stored in a folder for each model, and under it a folder for each dataset. 
+                    help="""If passed, store anomaly score maps that are extracted in full evaluation.
+                    The map will be stored in a folder for each model, and under it a folder for each dataset.
                     All will be stored under anomaly_scores/ folder""")
 parser.add_argument('--model_mode', type=str, default='all',
-                    help="""One of [all, selective]. Defines which models to evaluate, the default behavior is all, which is to 
+                    help="""One of [all, selective]. Defines which models to evaluate, the default behavior is all, which is to
                             evaluate all models in model_logs dir. You can also choose particular models
                             for evaluation, in which case you need to pass the names of the models to --selected_models""")
 parser.add_argument("--selected_models", nargs="*", type=str, default=[],
                     help="Names of models to be evaluated, these should be name of directories in model_logs")
 parser.add_argument('--dataset_mode', type=str, default='all',
-                    help="""One of [all, selective]. Defines which datasets to evaluate on, the default behavior is all, which is to 
+                    help="""One of [all, selective]. Defines which datasets to evaluate on, the default behavior is all, which is to
                             evaluate all available datasets. You can also choose particular datasets
                             for evaluation, in which case you need to pass the names of the datasets to --selected_datasets.
                             Available Datasets are: [
@@ -66,7 +66,10 @@ parser.add_argument("--selected_datasets", nargs="*", type=str, default=[],
                     """)
 parser.add_argument("--score_func", type=str, default="rba", choices=["rba", "pebal", "dense_hybrid"],
                     help="outlier scoring function to be used in evaluations")
-    
+
+parser.add_argument("--roi", type=str,
+                    help="pass for masking in images")
+
 
 args = parser.parse_args()
 
@@ -141,12 +144,12 @@ def get_logits(model, x, **kwargs):
 
 
 def get_RbA(model, x, **kwargs):
-    
+
     with torch.no_grad():
         out = model([{"image": x[0].to(DEVICE)}])
 
     logits = out[0]['sem_seg']
-    
+
     return -logits.tanh().sum(dim=0)
 
 def get_energy(model, x, **kwargs):
@@ -164,7 +167,7 @@ def get_densehybrid_score(model, x, **kwargs):
         out, ood_pred = model([{"image": x[0].cuda()}], return_ood_pred=True)
 
     logits = out[0]['sem_seg']
-    
+
     out = F.softmax(ood_pred, dim=1)
     p1 = torch.logsumexp(logits, dim=0)
     p2 = out[:, 1] # p(~din|x)
@@ -174,7 +177,7 @@ def get_densehybrid_score(model, x, **kwargs):
 
 def save_dict(d, name):
     """
-    Save the records into args.out_path. 
+    Save the records into args.out_path.
     Print the records to console if verbose=True
     """
     if args.verbose:
@@ -211,9 +214,10 @@ def run_evaluations(model, dataset, model_name, dataset_name):
         dataset, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers)
     anomaly_score, ood_gts = evaluator.compute_anomaly_scores(
         loader=loader,
+        insert_roi=args.roi,
         device=DEVICE,
         return_preds=False,
-        upper_limit=1300
+        upper_limit=185
     )
 
     if args.store_anomaly_scores:
@@ -222,16 +226,20 @@ def run_evaluations(model, dataset, model_name, dataset_name):
         os.makedirs(vis_path, exist_ok=True)
         for i in tqdm(range(len(anomaly_score)), desc=f"storing anomaly scores at {vis_path}"):
 
+            # np.save(os.path.join(vis_path, f"array_score_{i}.npy"), anomaly_score[i])
+
             # for evaluation set anomaly scores between 1 and 0
             # change formula to 1 - x
             # set all negative values to zero
-            
+
             anomaly_score_i = anomaly_score[i] + 1
             anomaly_score_i = anomaly_score_i.clip(min=0)
 
             np.save(os.path.join(vis_path, "array_score_{}.npy".format(str(i).rjust(10, '0'))), anomaly_score_i)
 
-            mpimg.imsave(os.path.join(vis_path, "img_score_{}.png".format(str(i).rjust(10, '0'))), anomaly_score_i.squeeze(), cmap='viridis')
+            # to store images, do NOT insert region of interest
+            if not args.roi:
+                mpimg.imsave(os.path.join(vis_path, "img_score_{}.png".format(str(i).rjust(10, '0'))), anomaly_score_i.squeeze(), cmap='viridis')
 
 
 
@@ -272,7 +280,7 @@ def main():
 
         config_path = os.path.join(experiment_path, 'config.yaml')
         model_path= os.path.join(experiment_path, 'model_final.pth')
-    
+
         if current_result_exists(model_name):
             print(f"Skipping {model_name} because results already exist, if you want to re-run, delete the results.pkl file")
             continue
@@ -293,7 +301,7 @@ def main():
                 results[dataset_name] = edict()
 
             results[dataset_name] = run_evaluations(model, dataset, model_name, dataset_name)
-        
+
         save_dict(results, model_name)
 
 if __name__ == '__main__':
