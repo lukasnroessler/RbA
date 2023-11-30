@@ -21,7 +21,7 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from typing import Callable
-from sklearn.metrics import roc_curve, auc, average_precision_score
+from sklearn.metrics import roc_curve, auc, average_precision_score, f1_score, confusion_matrix
 from ood_metrics import fpr_at_95_tpr
 from PIL import Image
 import matplotlib.image as mpimg
@@ -265,6 +265,7 @@ class OODEvaluator:
         # print(k)
         return roc_auc, fpr_best, k
 
+
     def calculate_ood_metrics(self, out, label):
 
         # fpr, tpr, _ = roc_curve(label, out)
@@ -281,11 +282,20 @@ class OODEvaluator:
         ood_gts = ood_gts.squeeze()
         anomaly_score = anomaly_score.squeeze()
 
+        # anomaly_score_i = 1 + anomaly_score
+        # anomaly_score_i = anomaly_score_i.clip(min=0)
+        # print("median:", np.median(anomaly_score_i))
+        # print("avg", np.mean(anomaly_score_i))
+
         ood_mask = (ood_gts == 1)
         ind_mask = (ood_gts == 0)
 
+        print("size of ood mask", np.count_nonzero(ood_mask))
+        print("total amount of pixels", len(ood_gts))
+
         ood_out = anomaly_score[ood_mask]
         ind_out = anomaly_score[ind_mask]
+
 
         ood_label = np.ones(len(ood_out))
         ind_label = np.zeros(len(ind_out))
@@ -367,6 +377,7 @@ class OODEvaluator:
         return_preds=False,
         use_gaussian_smoothing=False,
         upper_limit=450,
+        eval_normality=False
     ):
         if insert_roi:
             mask_img = Image.open(insert_roi)
@@ -376,8 +387,15 @@ class OODEvaluator:
         jj = 0
         if use_gaussian_smoothing:
             gaussian_smoothing = transforms.GaussianBlur(7, sigma=1)
-
+        normal_counter = 0
+        counter = 0
         for x, y in tqdm(loader, desc="Dataset Iteration"):
+            # counter += 1
+            # if counter < 1675:
+            #     continue
+            # if counter > 1675:
+            #     break
+
 
             if jj >= upper_limit:
                 break
@@ -393,6 +411,14 @@ class OODEvaluator:
             if use_gaussian_smoothing:
                 score = gaussian_smoothing(score.unsqueeze(0)).squeeze(0)
 
+
+            ood_gt = y.cpu().numpy()
+            scores = score.cpu().numpy()
+
+            # if np.count_nonzero(ood_gt) == 0 and eval_normality:
+            #     normal_counter += 1
+            #     continue
+
             if return_preds:
                 logits = self.get_logits(x)
                 _, preds = logits[:, :19, :, :].max(dim=1)
@@ -400,8 +426,10 @@ class OODEvaluator:
 
             # anomaly_score.extend([score.cpu().numpy()])
             # overwritten
-            ood_gt = y.cpu().numpy()
-            scores = score.cpu().numpy()
+
+            ##
+            # scores = scores + 1
+            ##
 
             if insert_roi: #
                 roi = np.array(mask_img)
@@ -422,4 +450,5 @@ class OODEvaluator:
             predictions = np.array(predictions)
             return anomaly_score, ood_gts, predictions
 
+        print("NORMALITY ON THIS MANY FRAMES: ", normal_counter)
         return anomaly_score, ood_gts

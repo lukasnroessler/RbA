@@ -70,6 +70,10 @@ parser.add_argument("--score_func", type=str, default="rba", choices=["rba", "pe
 parser.add_argument("--roi", type=str,
                     help="pass for masking in images")
 
+parser.add_argument("--include_normality", action='store_true',
+                    help="pass for masking in images")
+
+
 
 args = parser.parse_args()
 
@@ -217,13 +221,17 @@ def run_evaluations(model, dataset, model_name, dataset_name):
         insert_roi=args.roi,
         device=DEVICE,
         return_preds=False,
-        upper_limit=185
+        upper_limit=1850,
+        eval_normality=args.include_normality
     )
 
     if args.store_anomaly_scores:
 
         vis_path = os.path.join(f"anomaly_scores/{model_name}/{dataset_name}")
         os.makedirs(vis_path, exist_ok=True)
+        os.mkdir(os.path.join(vis_path, "arrays"))
+        os.mkdir(os.path.join(vis_path, "images"))
+
         for i in tqdm(range(len(anomaly_score)), desc=f"storing anomaly scores at {vis_path}"):
 
             # np.save(os.path.join(vis_path, f"array_score_{i}.npy"), anomaly_score[i])
@@ -232,14 +240,15 @@ def run_evaluations(model, dataset, model_name, dataset_name):
             # change formula to 1 - x
             # set all negative values to zero
 
-            anomaly_score_i = anomaly_score[i] + 1
-            anomaly_score_i = anomaly_score_i.clip(min=0)
+            # anomaly_score_i = 1 + anomaly_score[i]
+            # anomaly_score_i = anomaly_score_i.clip(min=0)
+            anomaly_score_i = anomaly_score[i]
 
-            np.save(os.path.join(vis_path, "array_score_{}.npy".format(str(i).rjust(10, '0'))), anomaly_score_i)
+            np.save(os.path.join(vis_path, "arrays", "array_score_{}.npy".format(str(i).rjust(10, '0'))), anomaly_score_i)
 
             # to store images, do NOT insert region of interest
             if not args.roi:
-                mpimg.imsave(os.path.join(vis_path, "img_score_{}.png".format(str(i).rjust(10, '0'))), anomaly_score_i.squeeze(), cmap='viridis')
+                mpimg.imsave(os.path.join(vis_path, "images","img_score_{}.png".format(str(i).rjust(10, '0'))), anomaly_score_i.squeeze(), cmap='viridis')
 
 
 
