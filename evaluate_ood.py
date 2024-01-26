@@ -5,9 +5,9 @@ import numpy as np
 import argparse
 import pickle
 import matplotlib.image as mpimg
-import albumentations as A
+# import albumentations as A
 from pathlib import Path
-from albumentations.pytorch import ToTensorV2
+# from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from datasets.cityscapes import Cityscapes
@@ -197,6 +197,7 @@ def current_result_exists(model_name):
     Check if the current results exist in the args.out_path
     """
     store_path = os.path.join(args.out_path, model_name)
+    print(store_path)
     return os.path.exists(os.path.join(store_path, f'results.pkl'))
 
 def run_evaluations(model, dataset, model_name, dataset_name):
@@ -289,7 +290,6 @@ def main():
 
         config_path = os.path.join(experiment_path, 'config.yaml')
         model_path= os.path.join(experiment_path, 'model_final.pth')
-
         if current_result_exists(model_name):
             print(f"Skipping {model_name} because results already exist, if you want to re-run, delete the results.pkl file")
             continue

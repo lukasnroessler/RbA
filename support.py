@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 from typing import Callable
 from sklearn.metrics import roc_curve, auc, average_precision_score, f1_score, confusion_matrix
-from ood_metrics import fpr_at_95_tpr
+# from ood_metrics import fpr_at_95_tpr
 from PIL import Image
 import matplotlib.image as mpimg
 
@@ -387,7 +387,7 @@ class OODEvaluator:
         jj = 0
         if use_gaussian_smoothing:
             gaussian_smoothing = transforms.GaussianBlur(7, sigma=1)
-        normal_counter = 0
+        normality_img_counter = 0
         counter = 0
         for x, y in tqdm(loader, desc="Dataset Iteration"):
             # counter += 1
@@ -415,9 +415,9 @@ class OODEvaluator:
             ood_gt = y.cpu().numpy()
             scores = score.cpu().numpy()
 
-            # if np.count_nonzero(ood_gt) == 0 and eval_normality:
-            #     normal_counter += 1
-            #     continue
+            if np.count_nonzero(ood_gt) == 0 and not eval_normality:
+                normality_img_counter += 1
+                continue
 
             if return_preds:
                 logits = self.get_logits(x)
@@ -450,5 +450,5 @@ class OODEvaluator:
             predictions = np.array(predictions)
             return anomaly_score, ood_gts, predictions
 
-        print("NORMALITY ON THIS MANY FRAMES: ", normal_counter)
+        print("NORMALITY ON THIS MANY FRAMES: ", normality_img_counter)
         return anomaly_score, ood_gts
